@@ -129,7 +129,7 @@ class BaseSearchBackend(object):
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                             fields='', highlight=False, facets=None,
-                            date_facets=None, query_facets=None,
+                            date_facets=None, query_facets=None, aggregations=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
                             models=None, limit_to_registered_models=None,
@@ -453,6 +453,7 @@ class BaseSearchQuery(object):
         self.highlight = False
         self.facets = {}
         self.date_facets = {}
+        self.aggregations = {}
         self.query_facets = []
         self.narrow_queries = set()
         #: If defined, fields should be a list of field names - no other values
@@ -516,6 +517,9 @@ class BaseSearchQuery(object):
 
         if self.facets:
             kwargs['facets'] = self.facets
+
+        if self.aggregations:
+            kwargs['aggregations'] = self.aggregations
 
         if self.date_facets:
             kwargs['date_facets'] = self.date_facets
@@ -897,6 +901,12 @@ class BaseSearchQuery(object):
         field_name = connections[self._using].get_unified_index().get_facet_fieldname(field)
         self.facets[field_name] = options.copy()
 
+    def add_aggregation(self, field, agg_type):
+        """Adds a regular facet on a field."""
+        from haystack import connections
+        field_name = connections[self._using].get_unified_index().get_facet_fieldname(field)
+        self.aggregations[field_name] = {'agg_type': agg_type}
+
     def add_date_facet(self, field, start_date, end_date, gap_by, gap_amount=1):
         """Adds a date-based facet on a field."""
         from haystack import connections
@@ -993,6 +1003,7 @@ class BaseSearchQuery(object):
         clone.highlight = self.highlight
         clone.stats = self.stats.copy()
         clone.facets = self.facets.copy()
+        clone.aggregations = self.aggregations.copy()
         clone.date_facets = self.date_facets.copy()
         clone.query_facets = self.query_facets[:]
         clone.narrow_queries = self.narrow_queries.copy()

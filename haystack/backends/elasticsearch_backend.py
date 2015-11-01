@@ -256,7 +256,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                             fields='', highlight=False, facets=None,
-                            date_facets=None, query_facets=None,
+                            date_facets=None, query_facets=None, aggregations=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
                             models=None, limit_to_registered_models=None,
@@ -363,6 +363,18 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 facet_options['terms'].update(extra_options)
                 kwargs['facets'][facet_fieldname] = facet_options
 
+        if aggregations is not None:
+            kwargs.setdefault('aggregations', {})
+
+            for facet_fieldname, value in aggregations.items():
+                agg_type = value.get('agg_type')
+                key = '{}_{}'.format(agg_type, facet_fieldname)
+                kwargs['aggregations'][key] = {
+                    agg_type: {
+                        'field': facet_fieldname
+                    },
+                }
+
         if date_facets is not None:
             kwargs.setdefault('facets', {})
 
@@ -456,9 +468,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
             #     incompatible change on the distance filter formating
             if elasticsearch.VERSION >= (1, 0, 0):
                 distance = "%(dist).6f%(unit)s" % {
-                        'dist': dwithin['distance'].km,
-                        'unit': "km"
-                    }
+                    'dist': dwithin['distance'].km, 'unit': "km"
+                }
             else:
                 distance = dwithin['distance'].km
 
@@ -596,6 +607,11 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                     facets['dates'][facet_fieldname] = [(datetime.datetime.utcfromtimestamp(individual['time'] / 1000), individual['count']) for individual in facet_info['entries']]
                 elif facet_info.get('_type', 'terms') == 'query':
                     facets['queries'][facet_fieldname] = facet_info['count']
+
+        if 'aggregations' in raw_results:
+            facets['aggregations'] = {}
+            for aggregate_fieldname, values in raw_results['aggregations'].items():
+                facets['aggregations'][aggregate_fieldname] = values
 
         unified_index = connections[self.connection_alias].get_unified_index()
         indexed_models = unified_index.get_indexed_models()
@@ -735,15 +751,15 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
 DEFAULT_FIELD_MAPPING = {'type': 'string', 'analyzer': 'snowball'}
 FIELD_MAPPINGS = {
     'edge_ngram': {'type': 'string', 'analyzer': 'edgengram_analyzer'},
-    'ngram':      {'type': 'string', 'analyzer': 'ngram_analyzer'},
-    'date':       {'type': 'date'},
-    'datetime':   {'type': 'date'},
+    'ngram': {'type': 'string', 'analyzer': 'ngram_analyzer'},
+    'date': {'type': 'date'},
+    'datetime': {'type': 'date'},
 
-    'location':   {'type': 'geo_point'},
-    'boolean':    {'type': 'boolean'},
-    'float':      {'type': 'float'},
-    'long':       {'type': 'long'},
-    'integer':    {'type': 'long'},
+    'location': {'type': 'geo_point'},
+    'boolean': {'type': 'boolean'},
+    'float': {'type': 'float'},
+    'long': {'type': 'long'},
+    'integer': {'type': 'long'},
 }
 
 
@@ -889,6 +905,9 @@ class ElasticsearchSearchQuery(BaseSearchQuery):
 
         if self.facets:
             search_kwargs['facets'] = self.facets
+
+        if self.aggregations:
+            search_kwargs['aggregations'] = self.aggregations
 
         if self.fields:
             search_kwargs['fields'] = self.fields
