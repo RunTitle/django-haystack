@@ -9,7 +9,7 @@ from django.utils import six
 
 from haystack import connection_router, connections
 from haystack.backends import SQ
-from haystack.constants import DEFAULT_OPERATOR, ITERATOR_LOAD_PER_QUERY, REPR_OUTPUT_SIZE
+from haystack.constants import DEFAULT_OPERATOR, ITERATOR_LOAD_PER_QUERY
 from haystack.exceptions import NotHandled
 from haystack.inputs import AutoQuery, Raw
 from haystack.utils import log as logging
@@ -84,12 +84,7 @@ class SearchQuerySet(object):
         self.log = logging.getLogger('haystack')
 
     def __repr__(self):
-        data = list(self[:REPR_OUTPUT_SIZE])
-
-        if len(self) > REPR_OUTPUT_SIZE:
-            data[-1] = "...(remaining elements truncated)..."
-
-        return repr(data)
+        return u"<SearchQuerySet: query=%r, using=%r>" % (self.query, self._using)
 
     def __len__(self):
         if not self._result_count:
@@ -248,7 +243,7 @@ class SearchQuerySet(object):
         assert ((not isinstance(k, slice) and (k >= 0))
                 or (isinstance(k, slice) and (k.start is None or k.start >= 0)
                     and (k.stop is None or k.stop >= 0))), \
-                "Negative indexing is not supported."
+            "Negative indexing is not supported."
 
         # Remember if it's a slice or not. We're going to treat everything as
         # a slice to simply the logic and will `.pop()` at the end as needed.
@@ -633,7 +628,7 @@ class ValuesListSearchQuerySet(SearchQuerySet):
         clone._flat = self._flat
         return clone
 
-    def _fill_cache(self, start, end):
+    def _fill_cache(self, start, end, **kwargs):
         query_fields = set(self._internal_fields)
         query_fields.update(self._fields)
         kwargs = {
@@ -661,14 +656,6 @@ class ValuesSearchQuerySet(ValuesListSearchQuerySet):
     the key/value pairs for the result, exactly like Django's
     ``ValuesQuerySet``.
     """
-    def _fill_cache(self, start, end):
-        query_fields = set(self._internal_fields)
-        query_fields.update(self._fields)
-        kwargs = {
-            'fields': query_fields
-        }
-        return super(ValuesListSearchQuerySet, self)._fill_cache(start, end, **kwargs)
-
     def post_process_results(self, results):
         to_cache = []
 
@@ -794,7 +781,7 @@ class RelatedSearchQuerySet(SearchQuerySet):
         assert ((not isinstance(k, slice) and (k >= 0))
                 or (isinstance(k, slice) and (k.start is None or k.start >= 0)
                     and (k.stop is None or k.stop >= 0))), \
-                "Negative indexing is not supported."
+            "Negative indexing is not supported."
 
         # Remember if it's a slice or not. We're going to treat everything as
         # a slice to simply the logic and will `.pop()` at the end as needed.
