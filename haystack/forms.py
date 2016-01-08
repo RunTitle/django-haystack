@@ -3,7 +3,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from django import forms
-from django.db import models
 from django.utils.text import capfirst
 from django.utils.translation import ugettext_lazy as _
 
@@ -11,6 +10,7 @@ from haystack import connections
 from haystack.constants import DEFAULT_ALIAS
 from haystack.query import EmptySearchQuerySet, SearchQuerySet
 from haystack.utils import get_model_ct
+from haystack.utils.app_loading import haystack_get_model
 
 try:
     from django.utils.encoding import smart_text
@@ -99,7 +99,10 @@ class FacetedSearchForm(SearchForm):
 class ModelSearchForm(SearchForm):
     def __init__(self, *args, **kwargs):
         super(ModelSearchForm, self).__init__(*args, **kwargs)
-        self.fields['models'] = forms.MultipleChoiceField(choices=model_choices(), required=False, label=_('Search In'), widget=forms.CheckboxSelectMultiple)
+        self.fields['models'] = forms.MultipleChoiceField(
+            choices=model_choices(), required=False,
+            label=_('Search In'), widget=forms.CheckboxSelectMultiple
+        )
 
     def get_models(self):
         """Return an alphabetical list of model classes in the index."""
@@ -107,7 +110,7 @@ class ModelSearchForm(SearchForm):
 
         if self.is_valid():
             for model in self.cleaned_data['models']:
-                search_models.append(models.get_model(*model.split('.')))
+                search_models.append(haystack_get_model(*model.split('.')))
 
         return search_models
 
